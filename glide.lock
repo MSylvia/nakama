@@ -57,6 +57,9 @@ imports:
   - internal/exit
   - internal/multierror
   - zapcore
+  version: a5783ee4b216a927da8f839c45cfbf9d694e1467
+- name: github.com/yuin/gopher-lua
+  version: 65fb8eeb2aa6d29a7b654d61afd1a07ce3897cc9
 - name: golang.org/x/crypto
   version: f6b343c37ca80bfa8ea539da67a0b621f84fab1d
   subpackages:
