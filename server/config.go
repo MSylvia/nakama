@@ -36,15 +36,15 @@ type Config interface {
 }
 
 type config struct {
-	Name      string           `yaml:"name" json:"name"`
-	Datadir   string           `yaml:"data_dir" json:"data_dir"`
-	Port      int              `yaml:"port" json:"port"`
-	OpsPort   int              `yaml:"ops_port" json:"ops_port"`
-	Dsns      []string         `yaml:"dsns" json:"dsns"`
-	Session   *SessionConfig   `yaml:"session" json:"session"`
-	Transport *TransportConfig `yaml:"transport" json:"transport"`
-	Database  *DatabaseConfig  `yaml:"database" json:"database"`
-	Social    *SocialConfig    `yaml:"social" json:"social"`
+	Name      string           `yaml:"name" json:"name" flag:"name"`
+	Datadir   string           `yaml:"data_dir" json:"data_dir" flag:"data-dir"`
+	Port      int              `yaml:"port" json:"port" flag:"port"`
+	OpsPort   int              `yaml:"ops_port" json:"ops_port" flag:"ops-port"`
+	Dsns      []string         `yaml:"dsns" json:"dsns" flag:"dsns"`
+	Session   *SessionConfig   `yaml:"session" json:"session"  flag:"session"`
+	Transport *TransportConfig `yaml:"transport" json:"transport" flag:"transport"`
+	Database  *DatabaseConfig  `yaml:"database" json:"database" flag:"database"`
+	Social    *SocialConfig    `yaml:"social" json:"social" flag:"social"`
 }
 
 // NewConfig constructs a Config struct which represents server settings.
@@ -57,7 +57,6 @@ func NewConfig() *config {
 		Datadir:   dataDirectory,
 		Port:      7350,
 		OpsPort:   7351,
-		Dsns:      []string{"root@localhost:26257"},
 		Session:   NewSessionConfig(),
 		Transport: NewTransportConfig(),
 		Database:  NewDatabaseConfig(),
@@ -103,8 +102,8 @@ func (c *config) GetSocial() *SocialConfig {
 
 // SessionConfig is configuration relevant to the session
 type SessionConfig struct {
-	EncryptionKey string `yaml:"encryption_key" json:"encryption_key"`
-	TokenExpiryMs int64  `yaml:"token_expiry_ms" json:"token_expiry_ms"`
+	EncryptionKey string `yaml:"encryption_key" json:"encryption_key" flag:"encryption-key"`
+	TokenExpiryMs int64  `yaml:"token_expiry_ms" json:"token_expiry_ms" flag:"token-expiry-ms"`
 }
 
 // NewSessionConfig creates a new SessionConfig struct
@@ -117,11 +116,11 @@ func NewSessionConfig() *SessionConfig {
 
 // TransportConfig is configuration relevant to the transport socket and protocol
 type TransportConfig struct {
-	ServerKey           string `yaml:"server_key" json:"server_key"`
-	MaxMessageSizeBytes int64  `yaml:"max_message_size_bytes" json:"max_message_size_bytes"`
-	WriteWaitMs         int    `yaml:"write_wait_ms" json:"write_wait_ms"`
-	PongWaitMs          int    `yaml:"pong_wait_ms" json:"pong_wait_ms"`
-	PingPeriodMs        int    `yaml:"ping_period_ms" json:"ping_period_ms"`
+	ServerKey           string `yaml:"server_key" json:"server_key" flag:"server-key"`
+	MaxMessageSizeBytes int64  `yaml:"max_message_size_bytes" json:"max_message_size_bytes" flag:"max-message-size-bytes"`
+	WriteWaitMs         int    `yaml:"write_wait_ms" json:"write_wait_ms" flag:"write-wait-ms"`
+	PongWaitMs          int    `yaml:"pong_wait_ms" json:"pong_wait_ms" flag:"pong-wait-ms"`
+	PingPeriodMs        int    `yaml:"ping_period_ms" json:"ping_period_ms" flag:"ping-period-ms"`
 }
 
 // NewTransportConfig creates a new TransportConfig struct
@@ -137,9 +136,9 @@ func NewTransportConfig() *TransportConfig {
 
 // DatabaseConfig is configuration relevant to the Database storage
 type DatabaseConfig struct {
-	ConnMaxLifetimeMs int `yaml:"conn_max_lifetime_ms" json:"conn_max_lifetime_ms"`
-	MaxOpenConns      int `yaml:"max_open_conns" json:"max_open_conns"`
-	MaxIdleConns      int `yaml:"max_idle_conns" json:"max_idle_conns"`
+	ConnMaxLifetimeMs int `yaml:"conn_max_lifetime_ms" json:"conn_max_lifetime_ms" flag:"conn-max-lifetime-ms"`
+	MaxOpenConns      int `yaml:"max_open_conns" json:"max_open_conns" flag:"max-open-conns"`
+	MaxIdleConns      int `yaml:"max_idle_conns" json:"max_idle_conns" flag:"max-idle-conns"`
 }
 
 // NewDatabaseConfig creates a new DatabaseConfig struct
@@ -153,13 +152,13 @@ func NewDatabaseConfig() *DatabaseConfig {
 
 // SocialConfig is configuration relevant to the Social providers
 type SocialConfig struct {
-	Steam *SocialConfigSteam `yaml:"steam" json:"steam"`
+	Steam *SocialConfigSteam `yaml:"steam" json:"steam" flag:"steam"`
 }
 
 // SocialConfigSteam is configuration relevant to Steam
 type SocialConfigSteam struct {
-	PublisherKey string `yaml:"publisher_key" json:"publisher_key"`
-	AppID        int    `yaml:"app_id" json:"app_id"`
+	PublisherKey string `yaml:"publisher_key" json:"publisher_key" flag:"publisher-key"`
+	AppID        int    `yaml:"app_id" json:"app_id" flag:"app-id"`
 }
 
 // NewSocialConfig creates a new SocialConfig struct

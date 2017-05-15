@@ -1,5 +1,5 @@
-hash: 150ab75d51b17b2fb2b097193ea43bac8e07dfcb8ce0905c115be7e71639f506
-updated: 2017-04-13T23:43:22.128299698+01:00
+hash: 0cd58260377c7c50a394ecf07cb08f98db7b2943965e89c66917c6ba9833b9a3
+updated: 2017-05-14T21:44:55.72061694+01:00
 imports:
 - name: github.com/armon/go-metrics
   version: 97c69685293dce4c0a2d0b19535179bbc976e4d2
@@ -40,12 +40,8 @@ imports:
   - sqlparse
 - name: github.com/satori/go.uuid
   version: b061729afc07e77a8aa4fad0a2fd840958f1942a
-- name: github.com/uber-go/atomic
-  version: 3b8db5e93c4c02efbc313e17b2e796b0914a01fb
-- name: github.com/uber-go/zap
-  version: a2773be06b9ac7c318a3a105b5c310af5730c6b4
-  subpackages:
-  - zapcore
+- name: github.com/uber-go/flagoverride
+  version: b709bacc28f5e341cf44fc442d22515716edcf39
 - name: go.uber.org/atomic
   version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
 - name: go.uber.org/zap
