@@ -36,7 +36,6 @@ import (
 	_ "github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
-	lua "github.com/yuin/gopher-lua"
 )
 
 const (

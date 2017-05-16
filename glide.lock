@@ -1,5 +1,5 @@
-hash: 150ab75d51b17b2fb2b097193ea43bac8e07dfcb8ce0905c115be7e71639f506
-updated: 2017-04-13T23:43:22.128299698+01:00
+hash: aa8cb1c2e766e0a61570d0f760efbad623a759dcdbdaae137cad9c356ce0d14b
+updated: 2017-05-16T12:04:49.084465556+01:00
 imports:
 - name: github.com/armon/go-metrics
   version: 97c69685293dce4c0a2d0b19535179bbc976e4d2
@@ -40,10 +40,16 @@ imports:
   - sqlparse
 - name: github.com/satori/go.uuid
   version: b061729afc07e77a8aa4fad0a2fd840958f1942a
+- name: github.com/yuin/gopher-lua
+  version: 65fb8eeb2aa6d29a7b654d61afd1a07ce3897cc9
+  subpackages:
+  - ast
+  - parse
+  - pm
 - name: go.uber.org/atomic
   version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
 - name: go.uber.org/zap
-  version: a2773be06b9ac7c318a3a105b5c310af5730c6b4
+  version: fab453050a7a08c35f31fc5fff6f2dbd962285ab
   subpackages:
   - buffer
   - internal/bufferpool
@@ -51,9 +57,6 @@ imports:
   - internal/exit
   - internal/multierror
   - zapcore
-  version: a5783ee4b216a927da8f839c45cfbf9d694e1467
-- name: github.com/yuin/gopher-lua
-  version: 65fb8eeb2aa6d29a7b654d61afd1a07ce3897cc9
 - name: golang.org/x/crypto
   version: f6b343c37ca80bfa8ea539da67a0b621f84fab1d
   subpackages:

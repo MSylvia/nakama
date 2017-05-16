@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 )
 
