@@ -35,8 +35,8 @@ import (
 	"github.com/go-yaml/yaml"
 	_ "github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
-	lua "github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
+	lua "github.com/yuin/gopher-lua"
 )
 
 const (
@@ -93,28 +93,7 @@ func main() {
 	// Check migration status and log if the schema has diverged.
 	cmd.MigrationStartupCheck(multiLogger, db)
 
-	// Make module dir if not exists
-	modpath := filepath.Join(config.GetDataDir(), "modules")
-	os.MkdirAll(modpath, os.ModePerm)
-	// Accumulate all Lua modules.
-	modules := make([]string, 10)
-	err := filepath.Walk(modpath, func(path string, f os.FileInfo, err error) error {
-		fmt.Printf("Walked %s\n", path)
-		if !f.IsDir() {
-			modules = append(modules, path)
-		}
-		return nil
-	})
-	if err != nil {
-		mlogger.Error("Failed to walk script module dir.", zap.Error(err))
-	}
-	fmt.Printf("%+v\n", modules)
-	luavm := lua.NewState(lua.Options{
-		CallStackSize:       1024,
-		RegistrySize:        1024,
-		SkipOpenLibs:        true,
-		IncludeGoStackTrace: true})
-	defer luavm.Close()
+	server.InitRuntime(jsonLogger, config.GetDataDir())
 
 	trackerService := server.NewTrackerService(config.GetName())
 	statsService := server.NewStatsService(jsonLogger, config, semver, trackerService, startedAt)
