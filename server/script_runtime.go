@@ -61,13 +61,19 @@ func (r *ScriptRuntime) loadRuntimeModules(multiLogger *zap.Logger, datadir stri
 		r.logger.Error("Failed to load modules", zap.Error(err))
 	}
 
+	multiLogger.Info("Evaluating modules", zap.Int("count", len(r.modules)), zap.Strings("modules", modules))
+
 	l := r.NewState()
 	defer l.Close()
-	for _, mod := range r.modules {
-		l.DoString(mod)
+	for name, mod := range r.modules {
+		err := l.DoString(mod)
+		if err != nil {
+			r.logger.Error("Failed to evaluate module", zap.String("name", name), zap.Error(err))
+			delete(r.modules, name)
+		}
 	}
 
-	multiLogger.Info("Loaded modules", zap.Int("count", len(modules)), zap.Strings("modules", modules))
+	multiLogger.Info("Loaded modules", zap.Int("count", len(r.modules)))
 }
 
 func (r *ScriptRuntime) NewState() *lua.LState {
@@ -84,8 +90,14 @@ func (r *ScriptRuntime) NewState() *lua.LState {
 		l.Call(1, 0)
 	}
 
-	for _, mod := range r.modules {
-		l.LoadString(mod)
+	preload := l.GetField(l.GetField(l.Get(lua.EnvironIndex), "package"), "preload")
+	for name, module := range r.modules {
+		mod, err := l.LoadString(module)
+		if err != nil {
+			r.logger.Error("Failed to evaluate module", zap.String("name", name), zap.Error(err))
+		} else {
+			l.SetField(preload, name, mod)
+		}
 	}
 
 	return l

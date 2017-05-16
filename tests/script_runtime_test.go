@@ -4,12 +4,13 @@ import (
 	"nakama/server"
 	"testing"
 
+	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 )
 
 func newRuntime() *server.ScriptRuntime {
 	logger, _ := zap.NewDevelopment(zap.AddStacktrace(zap.ErrorLevel))
-	return server.NewScriptRuntime(logger, logger, "data/modules")
+	return server.NewScriptRuntime(logger, logger, "data")
 }
 
 func TestRuntimeSampleScript(t *testing.T) {
@@ -49,6 +50,45 @@ file_exists "./"
 	}
 }
 
-func TestLoadModules(t *testing.T) {
+func TestRuntimeRequire(t *testing.T) {
+	r := newRuntime()
+	l := r.NewState()
+	defer l.Close()
+	statsModule, e := l.LoadString(`
+stats={}
 
+-- Get the mean value of a table
+function stats.mean( t )
+  local sum = 0
+  local count= 0
+
+  for k,v in pairs(t) do
+    if type(v) == 'number' then
+      sum = sum + v
+      count = count + 1
+    end
+  end
+
+  return (sum / count)
+end
+
+return stats
+	`)
+
+	preload := l.GetField(l.GetField(l.Get(lua.EnvironIndex), "package"), "preload")
+	l.SetField(preload, "stats", statsModule)
+
+	if e != nil {
+		t.Error(e)
+	}
+
+	err := l.DoString(`
+local stats = require("stats")
+t = {[1]=5, [2]=7, [3]=8, [4]='Something else.'}
+-- print (stats.mean(t))
+		`)
+
+	if err != nil {
+		t.Error(err)
+	}
 }
