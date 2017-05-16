@@ -92,8 +92,7 @@ func main() {
 	// Check migration status and log if the schema has diverged.
 	cmd.MigrationStartupCheck(multiLogger, db)
 
-	server.InitRuntime(jsonLogger, config.GetDataDir())
-
+	server.NewScriptRuntime(jsonLogger, multiLogger, config.GetDataDir())
 	trackerService := server.NewTrackerService(config.GetName())
 	statsService := server.NewStatsService(jsonLogger, config, semver, trackerService, startedAt)
 	sessionRegistry := server.NewSessionRegistry(jsonLogger, config, trackerService)
