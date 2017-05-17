@@ -4,7 +4,6 @@ import (
 	"nakama/server"
 	"testing"
 
-	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 )
 
@@ -15,7 +14,7 @@ func newRuntime() *server.ScriptRuntime {
 
 func TestRuntimeSampleScript(t *testing.T) {
 	r := newRuntime()
-	l := r.NewState()
+	l, _ := r.NewStateThread()
 	defer l.Close()
 	err := l.DoString(`
 local example = "an example string"
@@ -31,7 +30,7 @@ end
 
 func TestRuntimeDisallowStandardLibs(t *testing.T) {
 	r := newRuntime()
-	l := r.NewState()
+	l, _ := r.NewStateThread()
 	defer l.Close()
 	err := l.DoString(`
 -- Return true if file exists and is readable.
@@ -52,9 +51,8 @@ file_exists "./"
 
 func TestRuntimeRequire(t *testing.T) {
 	r := newRuntime()
-	l := r.NewState()
-	defer l.Close()
-	statsModule, e := l.LoadString(`
+	l := r.NewState(map[string]string{
+		"stats": `
 stats={}
 
 -- Get the mean value of a table
@@ -73,19 +71,32 @@ function stats.mean( t )
 end
 
 return stats
-	`)
+	`,
+	})
+	defer l.Close()
 
-	preload := l.GetField(l.GetField(l.Get(lua.EnvironIndex), "package"), "preload")
-	l.SetField(preload, "stats", statsModule)
+	//
+	//preload := l.GetField(l.GetField(l.Get(lua.EnvironIndex), "package"), "preload")
+	//l.SetField(preload, "stats", statsModule)
 
-	if e != nil {
-		t.Error(e)
-	}
+	//if e != nil {
+	//	t.Error(e)
+	//}
 
 	err := l.DoString(`
 local stats = require("stats")
 t = {[1]=5, [2]=7, [3]=8, [4]='Something else.'}
--- print (stats.mean(t))
+print(stats.mean(t))
+		`)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = l.DoString(`
+local stats = require("stats")
+t = {[1]=5, [2]=7, [3]=8, [4]='Something else.'}
+print(stats.mean(t))
 		`)
 
 	if err != nil {
