@@ -105,7 +105,7 @@ func (p *pipeline) addFacebookFriends(logger *zap.Logger, userID []byte, accessT
 		}
 	}()
 
-	fbFriends, err := p.socialClient.GetFacebookFriends(accessToken)
+	fbFriends, err := p.SocialClient.GetFacebookFriends(accessToken)
 	if err != nil {
 		return
 	}

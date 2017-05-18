@@ -6,6 +6,8 @@ import (
 
 	"nakama/server/runtime_modules"
 
+	"errors"
+
 	"github.com/satori/go.uuid"
 	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
@@ -13,12 +15,13 @@ import (
 )
 
 type ScriptRuntime struct {
-	logger        *zap.Logger
-	multiLogger   *zap.Logger
-	luaPath       string
-	luaLibs       map[string]lua.LGFunction
-	modules       []string
-	snapshotState *lua.LState
+	logger         *zap.Logger
+	multiLogger    *zap.Logger
+	luaPath        string
+	luaLibs        map[string]lua.LGFunction
+	builtinModules map[string]runtime_modules.BuiltinModule
+	modules        []string
+	snapshotState  *lua.LState
 }
 
 func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir string) *ScriptRuntime {
@@ -35,6 +38,9 @@ func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir strin
 			lua.MathLibName:      lua.OpenMath,
 			lua.ChannelLibName:   lua.OpenChannel,
 			lua.CoroutineLibName: lua.OpenCoroutine,
+		},
+		builtinModules: map[string]runtime_modules.BuiltinModule{
+			"nakama": runtime_modules.NewNakamaModule(logger),
 		},
 	}
 
@@ -98,7 +104,10 @@ func (r *ScriptRuntime) newState() *lua.LState {
 		l.Call(1, 0)
 	}
 
-	l.PreloadModule("nakama", runtime_modules.NakamaModule)
+	for name, mod := range r.builtinModules {
+		l.PreloadModule(name, mod.Loader)
+	}
+
 	return l
 }
 
@@ -121,10 +130,25 @@ func (r *ScriptRuntime) NewStateThread() (*lua.LState, context.CancelFunc) {
 	return r.snapshotState.NewThread()
 }
 
-func (r *ScriptRuntime) InvokeLuaFunction(f string, uid uuid.UUID) {
-	l, _ := r.NewStateThread()
-	fun := runtime_modules.RegisteredFunctions[f]
+func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.UUID) error {
+	fn := runtime_modules.GetRegisteredFunction(fnType, fnKey)
+	if fn == nil {
+		r.logger.Error("Runtime function was not found", zap.String("key", fnType+fnKey))
+		return errors.New("Runtime function was not found")
+	}
 
-	//TODO(mo) fix this..
-	l.DoString(fun)
+	l, _ := r.NewStateThread()
+	defer l.Close()
+
+	l.Push(fn)
+
+	//l.Push(data)
+	//err := l.PCall(1, -1, nil)
+
+	err := l.PCall(0, -1, nil)
+	if err != nil {
+		r.logger.Error("Could not complete runtime invocation", zap.Error(err))
+	}
+
+	return err
 }

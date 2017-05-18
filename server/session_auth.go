@@ -85,7 +85,7 @@ func NewAuthenticationService(logger *zap.Logger, config Config, db *sql.DB, sta
 		registry:       registry,
 		pipeline:       pipeline,
 		scriptRuntime:  scriptRuntime,
-		socialClient:   social.NewClient(5 * time.Second),
+		socialClient:   pipeline.SocialClient,
 		random:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		hmacSecretByte: []byte(config.GetSession().EncryptionKey),
 		upgrader: &websocket.Upgrader{
@@ -169,8 +169,8 @@ func (a *authenticationService) configure() {
 		}
 
 		vars := mux.Vars(r)
-		p := runtime_modules.FUNC_INVOKE_HTTP + vars["module"] + "/" + vars["function"]
-		if _, ok := runtime_modules.RegisteredFunctions[p]; !ok {
+		p := vars["module"] + "/" + vars["function"]
+		if runtime_modules.GetRegisteredFunction(runtime_modules.FUNC_TYPE_HTTP, p) == nil {
 			http.Error(w, "Runtime could not be invoked. Module or function not found.", 404)
 			return
 		}
@@ -183,7 +183,7 @@ func (a *authenticationService) configure() {
 		}
 
 		//TODO(mo) send over the POST data to the func
-		a.scriptRuntime.InvokeLuaFunction(p, uid)
+		a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, p, uid)
 	}).Methods("POST", "OPTIONS")
 }
 

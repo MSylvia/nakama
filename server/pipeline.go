@@ -18,6 +18,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"nakama/pkg/social"
+	"time"
+
 	"go.uber.org/zap"
 )
 
@@ -27,6 +30,7 @@ type pipeline struct {
 	tracker         Tracker
 	messageRouter   MessageRouter
 	sessionRegistry *SessionRegistry
+	SocialClient    *social.Client
 }
 
 // NewPipeline creates a new Pipeline
@@ -37,6 +41,7 @@ func NewPipeline(config Config, db *sql.DB, tracker Tracker, messageRouter Messa
 		tracker:         tracker,
 		messageRouter:   messageRouter,
 		sessionRegistry: registry,
+		SocialClient:    social.NewClient(5 * time.Second),
 	}
 }
 

@@ -122,7 +122,7 @@ func (p *pipeline) linkFacebook(logger *zap.Logger, session *session, envelope *
 		return
 	}
 
-	fbProfile, err := p.socialClient.GetFacebookProfile(accessToken)
+	fbProfile, err := p.SocialClient.GetFacebookProfile(accessToken)
 	if err != nil {
 		logger.Warn("Could not get Facebook profile", zap.Error(err))
 		session.Send(ErrorMessage(envelope.CollationId, USER_LINK_PROVIDER_UNAVAILABLE, "Could not get Facebook profile"))
@@ -165,7 +165,7 @@ func (p *pipeline) linkGoogle(logger *zap.Logger, session *session, envelope *En
 		return
 	}
 
-	googleProfile, err := p.socialClient.GetGoogleProfile(accessToken)
+	googleProfile, err := p.SocialClient.GetGoogleProfile(accessToken)
 	if err != nil {
 		logger.Warn("Could not get Google profile", zap.Error(err))
 		session.Send(ErrorMessage(envelope.CollationId, USER_LINK_PROVIDER_UNAVAILABLE, "Could not get Google profile"))
@@ -203,7 +203,7 @@ func (p *pipeline) linkGameCenter(logger *zap.Logger, session *session, envelope
 		return
 	}
 
-	_, err := p.socialClient.CheckGameCenterID(gc.PlayerId, gc.BundleId, gc.Timestamp, gc.Salt, gc.Signature, gc.PublicKeyUrl)
+	_, err := p.SocialClient.CheckGameCenterID(gc.PlayerId, gc.BundleId, gc.Timestamp, gc.Salt, gc.Signature, gc.PublicKeyUrl)
 	if err != nil {
 		logger.Warn("Could not get Game Center profile", zap.Error(err))
 		session.Send(ErrorMessage(envelope.CollationId, USER_LINK_PROVIDER_UNAVAILABLE, "Could not get Game Center profile"))
@@ -249,7 +249,7 @@ func (p *pipeline) linkSteam(logger *zap.Logger, session *session, envelope *Env
 		return
 	}
 
-	steamProfile, err := p.socialClient.GetSteamProfile(p.config.GetSocial().Steam.PublisherKey, p.config.GetSocial().Steam.AppID, ticket)
+	steamProfile, err := p.SocialClient.GetSteamProfile(p.config.GetSocial().Steam.PublisherKey, p.config.GetSocial().Steam.AppID, ticket)
 	if err != nil {
 		logger.Warn("Could not get Steam profile", zap.Error(err))
 		session.Send(ErrorMessage(envelope.CollationId, USER_LINK_PROVIDER_UNAVAILABLE, "Could not get Steam profile"))

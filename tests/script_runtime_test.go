@@ -8,6 +8,9 @@ import (
 
 	"path/filepath"
 
+	"nakama/server/runtime_modules"
+
+	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
@@ -179,4 +182,36 @@ assert(test.count == 1)`)
 	}
 
 	os.RemoveAll(DATA_PATH)
+}
+
+func TestRuntimeRegisterHTTP(t *testing.T) {
+	r := newRuntime()
+	r.InitModules()
+	defer r.Stop()
+
+	r.AppendPreload(map[string]string{
+		"test": `
+test={}
+-- Get the mean value of a table
+function test.printWorld()
+	print("Hello World")
+end
+return test`})
+
+	l, _ := r.NewStateThread()
+	err := l.DoString(`
+local nakama = require("nakama")
+local test = require("test")
+nakama.register_http(test.printWorld, "/stats/increment")
+`)
+
+	if err != nil {
+		t.Error(err)
+	}
+	l.Close()
+
+	err = r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/stats/increment", uuid.Nil)
+	if err != nil {
+		t.Error(err)
+	}
 }
