@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var DATA_PATH = "/tmp/nakama/data/"
+const DATA_PATH = "/tmp/nakama/data/"
 
 func newRuntime() *server.ScriptRuntime {
 	logger, _ := zap.NewDevelopment(zap.AddStacktrace(zap.ErrorLevel))
@@ -20,6 +20,9 @@ func newRuntime() *server.ScriptRuntime {
 
 func TestRuntimeSampleScript(t *testing.T) {
 	r := newRuntime()
+	r.InitModules()
+	defer r.Stop()
+
 	l, _ := r.NewStateThread()
 	defer l.Close()
 	err := l.DoString(`
@@ -35,6 +38,9 @@ end`)
 
 func TestRuntimeDisallowStandardLibs(t *testing.T) {
 	r := newRuntime()
+	r.InitModules()
+	defer r.Stop()
+
 	l, _ := r.NewStateThread()
 	defer l.Close()
 	err := l.DoString(`
@@ -55,10 +61,11 @@ file_exists "./"`)
 
 func TestRuntimeRequireFile(t *testing.T) {
 	r := newRuntime()
+	defer r.Stop()
 
 	statsMod := []byte(`
 stats={}
-print("...loading file...")
+
 -- Get the mean value of a table
 function stats.mean( t )
   local sum = 0
@@ -76,13 +83,14 @@ end
 
 return stats`)
 	ioutil.WriteFile(filepath.Join(DATA_PATH, "/modules/stats.lua"), statsMod, 0644)
+	r.InitModules()
 
-	l := r.NewState()
+	l, _ := r.NewStateThread()
+	defer l.Close()
 	err := l.DoString(`
 local stats = require("stats")
 t = {[1]=5, [2]=7, [3]=8, [4]='Something else.'}
-print(stats.mean(t))
-		`)
+assert(stats.mean(t) > 0)`)
 
 	if err != nil {
 		t.Error(err)
@@ -93,8 +101,10 @@ print(stats.mean(t))
 
 func TestRuntimeRequirePreload(t *testing.T) {
 	r := newRuntime()
-	l := r.NewState()
-	r.PreloadModules(l, map[string]string{
+	r.InitModules()
+	defer r.Stop()
+
+	r.AppendPreload(map[string]string{
 		"stats": `
 stats={}
 
@@ -114,15 +124,59 @@ function stats.mean( t )
 end
 
 return stats`})
+
+	l, _ := r.NewStateThread()
 	defer l.Close()
 
 	err := l.DoString(`
 local stats = require("stats")
 t = {[1]=5, [2]=7, [3]=8, [4]='Something else.'}
-print(stats.mean(t))
-		`)
+print(stats.mean(t))`)
 
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestRuntimeDiscardChangesBetweenStates(t *testing.T) {
+	r := newRuntime()
+	defer r.Stop()
+
+	statsMod := []byte(`
+stats={}
+stats.count = 1
+return stats`)
+	ioutil.WriteFile(filepath.Join(DATA_PATH, "/modules/test.lua"), statsMod, 0644)
+	r.InitModules()
+
+	l, _ := r.NewStateThread()
+	defer l.Close()
+
+	err := l.DoString(`
+local test = require("test")
+test.count = 2`)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = l.DoString(`
+local test = require("test")
+assert(test.count == 2)`)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	l2, _ := r.NewStateThread()
+	defer l2.Close()
+	err = l2.DoString(`
+local test = require("test")
+assert(test.count == 1)`)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	os.RemoveAll(DATA_PATH)
 }

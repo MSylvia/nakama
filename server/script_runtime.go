@@ -11,6 +11,7 @@ import (
 
 type ScriptRuntime struct {
 	logger        *zap.Logger
+	multiLogger   *zap.Logger
 	luaPath       string
 	luaLibs       map[string]lua.LGFunction
 	modules       []string
@@ -19,8 +20,10 @@ type ScriptRuntime struct {
 
 func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir string) *ScriptRuntime {
 	r := &ScriptRuntime{
-		logger:  logger,
-		modules: make([]string, 0),
+		logger:      logger,
+		multiLogger: multiLogger,
+		modules:     make([]string, 0),
+		luaPath:     filepath.Join(datadir, "modules"),
 		luaLibs: map[string]lua.LGFunction{
 			lua.LoadLibName:      lua.OpenPackage,
 			lua.BaseLibName:      lua.OpenBase,
@@ -32,15 +35,14 @@ func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir strin
 		},
 	}
 
-	r.loadRuntimeModules(multiLogger, datadir)
+	if err := os.MkdirAll(r.luaPath, os.ModePerm); err != nil {
+		multiLogger.Fatal("Could not start script runtime", zap.Error(err))
+	}
 	return r
 }
 
-func (r *ScriptRuntime) loadRuntimeModules(multiLogger *zap.Logger, datadir string) {
-	r.luaPath = filepath.Join(datadir, "modules")
-	os.MkdirAll(r.luaPath, os.ModePerm)
-
-	r.logger.Info("Loading modules", zap.String("path", r.luaPath))
+func (r *ScriptRuntime) InitModules() {
+	r.logger.Info("Initialising modules", zap.String("path", r.luaPath))
 	err := filepath.Walk(r.luaPath, func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			r.logger.Warn("Could not read module - skipping", zap.Error(err))
@@ -51,29 +53,26 @@ func (r *ScriptRuntime) loadRuntimeModules(multiLogger *zap.Logger, datadir stri
 	})
 	if err != nil {
 		r.logger.Error("Failed to load modules", zap.Error(err))
+		return
 	}
-	multiLogger.Info("Evaluating modules", zap.Int("count", len(r.modules)), zap.Strings("modules", r.modules))
 
-	// first time create a blank state
-	// and evaluate all lua code for all register_XXX calls
-	// then discard, and keep reference in memory for later
-	l := r.NewState()
+	r.multiLogger.Info("Evaluating modules", zap.Int("count", len(r.modules)), zap.Strings("modules", r.modules))
+
+	l := r.newState()
 	defer l.Close()
 	failedModules := 0
 	for _, mod := range r.modules {
 		if err = l.DoFile(mod); err != nil {
 			failedModules++
-			r.logger.Error("Failed to evaluate module", zap.String("path", mod), zap.Error(err))
+			r.logger.Error("Failed to evaluate module - skipping", zap.String("path", mod), zap.Error(err))
 		}
 	}
 
-	multiLogger.Info("Loaded modules", zap.Int("count", len(r.modules)-failedModules))
-
-	// final state to keep in memory
-	r.snapshotState = r.NewState()
+	r.multiLogger.Info("Loaded modules", zap.Int("count", len(r.modules)-failedModules))
+	r.snapshotState = r.newState()
 }
 
-func (r *ScriptRuntime) NewState() *lua.LState {
+func (r *ScriptRuntime) newState() *lua.LState {
 	l := lua.NewState(lua.Options{
 		CallStackSize:       1024,
 		RegistrySize:        1024,
@@ -94,7 +93,8 @@ func (r *ScriptRuntime) NewState() *lua.LState {
 	return l
 }
 
-func (r *ScriptRuntime) PreloadModules(l *lua.LState, modules map[string]string) {
+func (r *ScriptRuntime) AppendPreload(modules map[string]string) {
+	l := r.snapshotState
 	preload := l.GetField(l.GetField(l.Get(lua.EnvironIndex), "package"), "preload")
 
 	for name, mod := range modules {
@@ -110,4 +110,8 @@ func (r *ScriptRuntime) PreloadModules(l *lua.LState, modules map[string]string)
 func (r *ScriptRuntime) NewStateThread() (*lua.LState, context.CancelFunc) {
 	//TODO(mo) use context to limit lua processing time
 	return r.snapshotState.NewThread()
+}
+
+func (r *ScriptRuntime) Stop() {
+	r.snapshotState.Close()
 }

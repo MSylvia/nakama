@@ -92,13 +92,15 @@ func main() {
 	// Check migration status and log if the schema has diverged.
 	cmd.MigrationStartupCheck(multiLogger, db)
 
-	server.NewScriptRuntime(jsonLogger, multiLogger, config.GetDataDir())
+	scriptRuntime := server.NewScriptRuntime(jsonLogger, multiLogger, config.GetDataDir())
 	trackerService := server.NewTrackerService(config.GetName())
 	statsService := server.NewStatsService(jsonLogger, config, semver, trackerService, startedAt)
 	sessionRegistry := server.NewSessionRegistry(jsonLogger, config, trackerService)
 	messageRouter := server.NewMessageRouterService(sessionRegistry)
 	presenceNotifier := server.NewPresenceNotifier(jsonLogger, config.GetName(), trackerService, messageRouter)
 	trackerService.AddDiffListener(presenceNotifier.HandleDiff)
+	scriptRuntime.InitModules()
+
 	authService := server.NewAuthenticationService(jsonLogger, config, db, statsService, sessionRegistry, trackerService, messageRouter)
 	opsService := server.NewOpsService(jsonLogger, multiLogger, semver, config, statsService)
 
@@ -117,9 +119,10 @@ func main() {
 		<-c
 		multiLogger.Info("Shutting down")
 
-		trackerService.Stop()
 		authService.Stop()
 		opsService.Stop()
+		trackerService.Stop()
+		scriptRuntime.Stop()
 
 		if gaenabled {
 			ga.SendSessionStop(http.DefaultClient, gacode, cookie)
