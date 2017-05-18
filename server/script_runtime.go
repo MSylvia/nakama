@@ -14,12 +14,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+type BuiltinModule interface {
+	Loader(l *lua.LState) int
+}
+
 type ScriptRuntime struct {
 	logger         *zap.Logger
 	multiLogger    *zap.Logger
 	luaPath        string
 	luaLibs        map[string]lua.LGFunction
-	builtinModules map[string]runtime_modules.BuiltinModule
+	builtinModules map[string]BuiltinModule
 	modules        []string
 	snapshotState  *lua.LState
 }
@@ -39,7 +43,7 @@ func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir strin
 			lua.ChannelLibName:   lua.OpenChannel,
 			lua.CoroutineLibName: lua.OpenCoroutine,
 		},
-		builtinModules: map[string]runtime_modules.BuiltinModule{
+		builtinModules: map[string]BuiltinModule{
 			"nakama": runtime_modules.NewNakamaModule(logger),
 		},
 	}
@@ -130,25 +134,26 @@ func (r *ScriptRuntime) NewStateThread() (*lua.LState, context.CancelFunc) {
 	return r.snapshotState.NewThread()
 }
 
-func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.UUID) error {
+func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.UUID) (*lua.LTable, error) {
 	fn := runtime_modules.GetRegisteredFunction(fnType, fnKey)
 	if fn == nil {
 		r.logger.Error("Runtime function was not found", zap.String("key", fnType+fnKey))
-		return errors.New("Runtime function was not found")
+		return nil, errors.New("Runtime function was not found")
 	}
 
 	l, _ := r.NewStateThread()
 	defer l.Close()
 
 	l.Push(fn)
-
 	//l.Push(data)
-	//err := l.PCall(1, -1, nil)
 
 	err := l.PCall(0, -1, nil)
+	//err := l.PCall(1, -1, nil)
 	if err != nil {
 		r.logger.Error("Could not complete runtime invocation", zap.Error(err))
 	}
 
-	return err
+	ret := l.CheckTable(1)
+	l.Pop(1)
+	return ret, err
 }

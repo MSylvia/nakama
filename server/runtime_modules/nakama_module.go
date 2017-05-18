@@ -14,23 +14,19 @@ const (
 	FUNC_TYPE_RPC    = "rpc_"
 )
 
-type BuiltinModule interface {
-	Loader(l *lua.LState) int
-}
-
 var (
-	registeredFunctionsMutex = &sync.Mutex{}
-	registeredFunctions      = make(map[string]*lua.LFunction)
+	_registeredFunctionsMutex = &sync.Mutex{}
+	_registeredFunctions      = make(map[string]*lua.LFunction)
 )
 
 func GetRegisteredFunction(fnType string, fnKey string) *lua.LFunction {
-	return registeredFunctions[fnType+fnKey]
+	return _registeredFunctions[fnType+fnKey]
 }
 
 func PutRegisteredFunction(fnType string, fnKey string, fn *lua.LFunction) {
-	registeredFunctionsMutex.Lock()
-	registeredFunctions[fnType+fnKey] = fn
-	registeredFunctionsMutex.Unlock()
+	_registeredFunctionsMutex.Lock()
+	_registeredFunctions[fnType+fnKey] = fn
+	_registeredFunctionsMutex.Unlock()
 }
 
 type NakamaModule struct {

@@ -194,7 +194,7 @@ func TestRuntimeRegisterHTTP(t *testing.T) {
 test={}
 -- Get the mean value of a table
 function test.printWorld()
-	print("Hello World")
+	return {["message"]="Hello World"}
 end
 return test`})
 
@@ -202,16 +202,20 @@ return test`})
 	err := l.DoString(`
 local nakama = require("nakama")
 local test = require("test")
-nakama.register_http(test.printWorld, "/stats/increment")
-`)
+nakama.register_http(test.printWorld, "/stats/increment")`)
 
 	if err != nil {
 		t.Error(err)
 	}
 	l.Close()
 
-	err = r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/stats/increment", uuid.Nil)
+	lt, err := r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/stats/increment", uuid.Nil)
 	if err != nil {
 		t.Error(err)
+	}
+
+	msg := lt.RawGetString("message").String()
+	if msg != "Hello World" {
+		t.Error("Invocation failed. Return result not expected")
 	}
 }
