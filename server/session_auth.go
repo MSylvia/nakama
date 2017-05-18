@@ -30,6 +30,8 @@ import (
 	"mime"
 	"strings"
 
+	"nakama/server/runtime_modules"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
@@ -63,6 +65,7 @@ type authenticationService struct {
 	statsService      StatsService
 	registry          *SessionRegistry
 	pipeline          *pipeline
+	scriptRuntime     *ScriptRuntime
 	mux               *mux.Router
 	hmacSecretByte    []byte
 	upgrader          *websocket.Upgrader
@@ -73,24 +76,23 @@ type authenticationService struct {
 }
 
 // NewAuthenticationService creates a new AuthenticationService
-func NewAuthenticationService(logger *zap.Logger, config Config, db *sql.DB, statService StatsService, registry *SessionRegistry, tracker Tracker, messageRouter MessageRouter) *authenticationService {
-	s := social.NewClient(5 * time.Second)
-	p := NewPipeline(config, db, s, tracker, messageRouter, registry)
+func NewAuthenticationService(logger *zap.Logger, config Config, db *sql.DB, statService StatsService, registry *SessionRegistry, pipeline *pipeline, scriptRuntime *ScriptRuntime) *authenticationService {
 	a := &authenticationService{
 		logger:         logger,
 		config:         config,
 		db:             db,
 		statsService:   statService,
 		registry:       registry,
-		pipeline:       p,
+		pipeline:       pipeline,
+		scriptRuntime:  scriptRuntime,
+		socialClient:   social.NewClient(5 * time.Second),
+		random:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		hmacSecretByte: []byte(config.GetSession().EncryptionKey),
 		upgrader: &websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin:     func(r *http.Request) bool { return true },
 		},
-		socialClient: s,
-		random:       rand.New(rand.NewSource(time.Now().UnixNano())),
 		jsonpbMarshaler: &jsonpb.Marshaler{
 			EnumsAsInts:  true,
 			EmitDefaults: false,
@@ -160,6 +162,29 @@ func (a *authenticationService) configure() {
 
 		a.registry.add(uid, handle, lang, conn, a.pipeline.processRequest)
 	}).Methods("GET", "OPTIONS")
+
+	a.mux.HandleFunc("/runtime/{module}/{function}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		vars := mux.Vars(r)
+		p := runtime_modules.FUNC_INVOKE_HTTP + vars["module"] + "/" + vars["function"]
+		if _, ok := runtime_modules.RegisteredFunctions[p]; !ok {
+			http.Error(w, "Runtime could not be invoked. Module or function not found.", 404)
+			return
+		}
+
+		token := r.URL.Query().Get("token")
+		uid, _, auth := a.authenticateToken(token)
+		if !auth {
+			uid = uuid.Nil
+			a.logger.Info("Runtime HTTP call intercepted with no or invalid auth header", zap.String("path", r.URL.Path), zap.String("token", token))
+		}
+
+		//TODO(mo) send over the POST data to the func
+		a.scriptRuntime.InvokeLuaFunction(p, uid)
+	}).Methods("POST", "OPTIONS")
 }
 
 func (a *authenticationService) StartServer(logger *zap.Logger) {

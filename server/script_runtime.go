@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"nakama/server/runtime_modules"
+
+	"github.com/satori/go.uuid"
 	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -39,6 +42,10 @@ func NewScriptRuntime(logger *zap.Logger, multiLogger *zap.Logger, datadir strin
 		multiLogger.Fatal("Could not start script runtime", zap.Error(err))
 	}
 	return r
+}
+
+func (r *ScriptRuntime) Stop() {
+	r.snapshotState.Close()
 }
 
 func (r *ScriptRuntime) InitModules() {
@@ -90,6 +97,8 @@ func (r *ScriptRuntime) newState() *lua.LState {
 		l.Push(lua.LString(name))
 		l.Call(1, 0)
 	}
+
+	l.PreloadModule("nakama", runtime_modules.NakamaModule)
 	return l
 }
 
@@ -112,6 +121,10 @@ func (r *ScriptRuntime) NewStateThread() (*lua.LState, context.CancelFunc) {
 	return r.snapshotState.NewThread()
 }
 
-func (r *ScriptRuntime) Stop() {
-	r.snapshotState.Close()
+func (r *ScriptRuntime) InvokeLuaFunction(f string, uid uuid.UUID) {
+	l, _ := r.NewStateThread()
+	fun := runtime_modules.RegisteredFunctions[f]
+
+	//TODO(mo) fix this..
+	l.DoString(fun)
 }

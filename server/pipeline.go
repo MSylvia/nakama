@@ -19,25 +19,21 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
-
-	"nakama/pkg/social"
 )
 
 type pipeline struct {
 	config          Config
 	db              *sql.DB
-	socialClient    *social.Client
 	tracker         Tracker
 	messageRouter   MessageRouter
 	sessionRegistry *SessionRegistry
 }
 
 // NewPipeline creates a new Pipeline
-func NewPipeline(config Config, db *sql.DB, socialClient *social.Client, tracker Tracker, messageRouter MessageRouter, registry *SessionRegistry) *pipeline {
+func NewPipeline(config Config, db *sql.DB, tracker Tracker, messageRouter MessageRouter, registry *SessionRegistry) *pipeline {
 	return &pipeline{
 		config:          config,
 		db:              db,
-		socialClient:    socialClient,
 		tracker:         tracker,
 		messageRouter:   messageRouter,
 		sessionRegistry: registry,
