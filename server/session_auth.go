@@ -165,6 +165,7 @@ func (a *authenticationService) configure() {
 
 	a.mux.HandleFunc("/runtime/{module}/{function}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
+			//TODO(mo): Do we need to return non-200 for endpoints that don't exist?
 			return
 		}
 
@@ -183,7 +184,9 @@ func (a *authenticationService) configure() {
 		}
 
 		//TODO(mo) send over the POST data to the func
+		//responseData, funError := a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, p, uid)
 		a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, p, uid)
+
 	}).Methods("POST", "OPTIONS")
 }
 

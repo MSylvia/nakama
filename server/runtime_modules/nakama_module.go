@@ -61,6 +61,7 @@ func (n *NakamaModule) registerAfter(l *lua.LState) int {
 
 func (n *NakamaModule) registerHTTP(l *lua.LState) int {
 	fn := l.CheckFunction(1)
+	//method := l.CheckString(2)
 	path := l.CheckString(2)
 
 	if path == "" {
