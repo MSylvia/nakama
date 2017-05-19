@@ -100,7 +100,9 @@ func main() {
 	presenceNotifier := server.NewPresenceNotifier(jsonLogger, config.GetName(), trackerService, messageRouter)
 	trackerService.AddDiffListener(presenceNotifier.HandleDiff)
 
-	scriptRuntime.InitModules()
+	if err := scriptRuntime.InitModules(); err != nil {
+		multiLogger.Fatal("Failed initializing runtime modules.", zap.Error(err))
+	}
 
 	pipeline := server.NewPipeline(config, db, trackerService, messageRouter, sessionRegistry)
 	authService := server.NewAuthenticationService(jsonLogger, config, db, statsService, sessionRegistry, pipeline, scriptRuntime)

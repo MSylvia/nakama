@@ -154,10 +154,11 @@ func (r *ScriptRuntime) InitModules() error {
 			continue
 		}
 
-		fnErr := r.invokeLFunction(l, fn)
+		l.Push(fn)
+		fnErr := l.PCall(0, -1, nil)
 		if fnErr != nil {
-			r.logger.Error("Could not evaluate module", zap.String("name", name), zap.Error(fnErr))
-			return err
+			r.logger.Error("Could not complete runtime invocation", zap.Error(fnErr))
+			return fnErr
 		}
 	}
 
@@ -193,18 +194,4 @@ func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.
 	ret := l.CheckTable(1)
 	l.Pop(1)
 	return ret, err
-}
-
-func (r *ScriptRuntime) invokeLFunction(l *lua.LState, fn *lua.LFunction) error {
-	l.Push(fn)
-	//l.Push(data)
-
-	err := l.PCall(0, -1, nil)
-	if err != nil {
-		r.logger.Error("Could not complete runtime invocation", zap.Error(err))
-		return err
-	}
-
-	//l.Pop(1)
-	return nil
 }
