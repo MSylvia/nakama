@@ -10,10 +10,16 @@ import (
 
 	"strings"
 
+	"fmt"
+
 	"github.com/satori/go.uuid"
 	"github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
+)
+
+const (
+	__nakamaReturnValue = "__nakama_return_flag__"
 )
 
 type BuiltinModule interface {
@@ -163,7 +169,7 @@ func (r *ScriptRuntime) InitModules() error {
 	}
 
 	r.snapshotState = l
-	r.multiLogger.Info("Loaded all modules successfully.")
+	r.multiLogger.Info("Loaded all modules successfully")
 	return nil
 }
 
@@ -172,7 +178,7 @@ func (r *ScriptRuntime) NewStateThread() (*lua.LState, context.CancelFunc) {
 	return r.snapshotState.NewThread()
 }
 
-func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.UUID) (*lua.LTable, error) {
+func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.UUID, inputData map[string]interface{}) (map[interface{}]interface{}, error) {
 	fn := runtime_modules.GetRegisteredFunction(fnType, fnKey)
 	if fn == nil {
 		r.logger.Error("Runtime function was not found", zap.String("key", fnType+fnKey))
@@ -182,16 +188,113 @@ func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.
 	l, _ := r.NewStateThread()
 	defer l.Close()
 
+	l.Push(lua.LString(__nakamaReturnValue))
 	l.Push(fn)
-	//l.Push(data)
 
-	err := l.PCall(0, -1, nil)
-	//err := l.PCall(1, -1, nil)
-	if err != nil {
-		r.logger.Error("Could not complete runtime invocation", zap.Error(err))
+	nargs := 0
+	if inputData != nil {
+		nargs = 1
+		l.Push(r.convertMap(l, inputData))
 	}
 
-	ret := l.CheckTable(1)
-	l.Pop(1)
-	return ret, err
+	err := l.PCall(nargs, -1, nil)
+	if err != nil {
+		r.logger.Error("Could not complete runtime invocation", zap.Error(err))
+		return nil, err
+	}
+
+	var retValue *lua.LTable
+	errMessage := "Runtime function returned invalid data. Only allowed one return value of type Lua Table"
+	for i := 0; i < 3; i++ {
+		ret := l.Get(1)
+		if ret.Type() == lua.LTTable && i == 0 { // If the first return value is Table, then decode it, otherwise raise error
+			retValue, _ = ret.(*lua.LTable)
+			l.Pop(1)
+		} else if ret.Type() == lua.LTString {
+			retString := lua.LVAsString(ret)
+			if retString == __nakamaReturnValue {
+				return nil, nil
+			}
+
+			r.logger.Error(errMessage, zap.String("function", fnKey))
+			return nil, errors.New(errMessage)
+		} else {
+			r.logger.Error(errMessage, zap.String("function", fnKey))
+			return nil, errors.New(errMessage)
+		}
+	}
+
+	return r.convertLuaTable(retValue), nil
+}
+
+func (r *ScriptRuntime) convertMap(l *lua.LState, data map[string]interface{}) *lua.LTable {
+	lt := l.NewTable()
+	for k, v := range data {
+		lt.RawSetString(k, r.convertValue(l, v))
+	}
+
+	return lt
+}
+
+func (r *ScriptRuntime) convertLuaTable(lv *lua.LTable) map[interface{}]interface{} {
+	returnData, _ := r.convertLuaValue(lv).(map[interface{}]interface{})
+	return returnData
+}
+
+func (r *ScriptRuntime) convertValue(l *lua.LState, val interface{}) lua.LValue {
+	if val == nil {
+		return lua.LNil
+	}
+
+	switch v := val.(type) {
+	case bool:
+		return lua.LBool(val)
+	case string:
+		return lua.LString(val)
+	case int, int8, int16, int32, int64, float32, float64:
+		return lua.LNumber(val)
+	case map[string]interface{}:
+		mapVal, _ := val.(map[string]interface{})
+		return r.convertMap(l, mapVal)
+	case []interface{}:
+		lt := l.NewTable()
+		arrayVal, _ := val.([]interface{})
+		for k, v := range arrayVal {
+			lt.RawSetInt(k, r.convertValue(l, v))
+		}
+		return lt
+	default:
+		return v
+	}
+}
+
+func (r *ScriptRuntime) convertLuaValue(lv lua.LValue) interface{} {
+	switch v := lv.(type) {
+	case *lua.LNilType:
+		return nil
+	case lua.LBool:
+		return bool(v)
+	case lua.LString:
+		return string(v)
+	case lua.LNumber:
+		return float64(v)
+	case *lua.LTable:
+		maxn := v.MaxN()
+		if maxn == 0 { // table
+			ret := make(map[interface{}]interface{})
+			v.ForEach(func(key, value lua.LValue) {
+				keystr := fmt.Sprint(r.convertLuaValue(key))
+				ret[keystr] = r.convertLuaValue(value)
+			})
+			return ret
+		} else { // array
+			ret := make([]interface{}, 0, maxn)
+			for i := 1; i <= maxn; i++ {
+				ret = append(ret, r.convertLuaValue(v.RawGetInt(i)))
+			}
+			return ret
+		}
+	default:
+		return v
+	}
 }

@@ -32,6 +32,8 @@ import (
 
 	"nakama/server/runtime_modules"
 
+	"encoding/json"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
@@ -163,16 +165,23 @@ func (a *authenticationService) configure() {
 		a.registry.add(uid, handle, lang, conn, a.pipeline.processRequest)
 	}).Methods("GET", "OPTIONS")
 
-	a.mux.HandleFunc("/runtime/{module}/{function}", func(w http.ResponseWriter, r *http.Request) {
+	a.mux.HandleFunc("/runtime/{endpoint}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			//TODO(mo): Do we need to return non-200 for endpoints that don't exist?
 			return
 		}
 
+		accept := r.Header.Get("accept")
+		if accept != "" || accept != "application/json" {
+			http.Error(w, "Runtime function only accept JSON data", 400)
+			return
+		}
+
 		vars := mux.Vars(r)
-		p := vars["module"] + "/" + vars["function"]
-		if runtime_modules.GetRegisteredFunction(runtime_modules.FUNC_TYPE_HTTP, p) == nil {
-			http.Error(w, "Runtime could not be invoked. Module or function not found.", 404)
+		endpoint := vars["endpoint"]
+		if runtime_modules.GetRegisteredFunction(runtime_modules.FUNC_TYPE_HTTP, endpoint) == nil {
+			a.logger.Warn("HTTP invocation failed as endpoint was not found", zap.String("endpoint", endpoint))
+			http.Error(w, "Runtime function could not be invoked. Endpoint not found.", 404)
 			return
 		}
 
@@ -184,8 +193,26 @@ func (a *authenticationService) configure() {
 		}
 
 		//TODO(mo) send over the POST data to the func
-		//responseData, funError := a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, p, uid)
-		a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, p, uid)
+		responseData, funError := a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, endpoint, uid, nil)
+		if funError != nil {
+			a.logger.Error("Runtime function caused an error", zap.String("endpoint", endpoint), zap.Error(funError))
+			http.Error(w, "Runtime function caused an error", 500)
+			return
+		}
+
+		var payload []byte
+		payloadString, err := json.Marshal(responseData)
+		if err != nil {
+			a.logger.Error("Could not marshal function response data", zap.Error(err))
+			http.Error(w, "Runtime function caused an error", 500)
+			return
+		}
+		payload = []byte(payloadString)
+		w.Header().Set("Content-Type", "application/json")
+
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(200)
+		w.Write(payload)
 
 	}).Methods("POST", "OPTIONS")
 }
