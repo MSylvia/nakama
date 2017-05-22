@@ -216,12 +216,12 @@ nakama.register_http(test.printWorld, "/test/helloworld")
 		t.Error(err)
 	}
 
-	lt, err := r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/test/helloworld", uuid.Nil, nil)
+	m, err := r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/test/helloworld", uuid.Nil, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg := lt.RawGetString("message").String()
+	msg := m["message"]
 	if msg != "Hello World" {
 		t.Error("Invocation failed. Return result not expected")
 	}
@@ -256,5 +256,46 @@ nakama.register_http(test.printWorld, "/test/helloworld")
 	_, err = r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/test/helloworld", uuid.Nil, nil)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestRuntimeRegisterHTTPWithInputData(t *testing.T) {
+	defer os.RemoveAll(DATA_PATH)
+	r := newRuntime()
+	defer r.Stop()
+
+	writeFile("test.lua", `
+test={}
+-- Get the mean value of a table
+function test.printWorld(inputData)
+	print("Hello World")
+	return inputData
+end
+
+print("Test Module Loaded")
+return test
+	`)
+	writeFile("http-invoke.lua", `
+local nakama = require("nakama")
+local test = require("test")
+nakama.register_http(test.printWorld, "/test/helloworld")
+	`)
+
+	err := r.InitModules()
+	if err != nil {
+		t.Error(err)
+	}
+
+	inputData := make(map[string]interface{})
+	inputData["message"] = "Hello World"
+
+	m, err := r.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, "/test/helloworld", uuid.Nil, inputData)
+	if err != nil {
+		t.Error(err)
+	}
+
+	msg := m["message"]
+	if msg != "Hello World" {
+		t.Error("Invocation failed. Return result not expected")
 	}
 }

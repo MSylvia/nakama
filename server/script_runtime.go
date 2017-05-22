@@ -206,13 +206,16 @@ func (r *ScriptRuntime) InvokeLuaFunction(fnType string, fnKey string, uid uuid.
 	var retValue *lua.LTable
 	errMessage := "Runtime function returned invalid data. Only allowed one return value of type Lua Table"
 	for i := 0; i < 3; i++ {
-		ret := l.Get(1)
+		ret := l.Get(-1)
 		if ret.Type() == lua.LTTable && i == 0 { // If the first return value is Table, then decode it, otherwise raise error
 			retValue, _ = ret.(*lua.LTable)
 			l.Pop(1)
 		} else if ret.Type() == lua.LTString {
 			retString := lua.LVAsString(ret)
 			if retString == __nakamaReturnValue {
+				if retValue != nil {
+					break //no longer process as we've received the end of lua stack
+				}
 				return nil, nil
 			}
 
@@ -248,23 +251,24 @@ func (r *ScriptRuntime) convertValue(l *lua.LState, val interface{}) lua.LValue 
 
 	switch v := val.(type) {
 	case bool:
-		return lua.LBool(val)
+		return lua.LBool(v)
 	case string:
-		return lua.LString(val)
+		return lua.LString(v)
 	case int, int8, int16, int32, int64, float32, float64:
-		return lua.LNumber(val)
+		f := v.(float64)
+		return lua.LNumber(f)
 	case map[string]interface{}:
-		mapVal, _ := val.(map[string]interface{})
-		return r.convertMap(l, mapVal)
+		//mapVal, _ := v.(map[string]interface{})
+		return r.convertMap(l, v)
 	case []interface{}:
 		lt := l.NewTable()
-		arrayVal, _ := val.([]interface{})
-		for k, v := range arrayVal {
+		//arrayVal, _ := val.([]interface{})
+		for k, v := range v {
 			lt.RawSetInt(k, r.convertValue(l, v))
 		}
 		return lt
 	default:
-		return v
+		return nil
 	}
 }
 

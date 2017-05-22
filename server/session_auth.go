@@ -34,6 +34,8 @@ import (
 
 	"encoding/json"
 
+	"io"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
@@ -192,27 +194,34 @@ func (a *authenticationService) configure() {
 			a.logger.Info("Runtime HTTP call intercepted with no or invalid auth header", zap.String("path", r.URL.Path), zap.String("token", token))
 		}
 
-		//TODO(mo) send over the POST data to the func
-		responseData, funError := a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, endpoint, uid, nil)
+		inputData := make(map[string]interface{})
+		defer r.Body.Close()
+		err := json.NewDecoder(r.Body).Decode(inputData)
+		switch {
+		case err == io.EOF:
+			inputData = nil
+		case err != nil:
+			a.logger.Error("Could not decode request data", zap.Error(err))
+			http.Error(w, "Bad request data", 400)
+			return
+		}
+
+		responseData, funError := a.scriptRuntime.InvokeLuaFunction(runtime_modules.FUNC_TYPE_HTTP, endpoint, uid, inputData)
 		if funError != nil {
 			a.logger.Error("Runtime function caused an error", zap.String("endpoint", endpoint), zap.Error(funError))
 			http.Error(w, "Runtime function caused an error", 500)
 			return
 		}
 
-		var payload []byte
-		payloadString, err := json.Marshal(responseData)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(responseData)
 		if err != nil {
 			a.logger.Error("Could not marshal function response data", zap.Error(err))
 			http.Error(w, "Runtime function caused an error", 500)
 			return
 		}
-		payload = []byte(payloadString)
-		w.Header().Set("Content-Type", "application/json")
-
-		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(200)
-		w.Write(payload)
 
 	}).Methods("POST", "OPTIONS")
 }
