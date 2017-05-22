@@ -249,20 +249,18 @@ func (r *ScriptRuntime) convertValue(l *lua.LState, val interface{}) lua.LValue 
 		return lua.LNil
 	}
 
+	// types looked up from https://golang.org/pkg/encoding/json/#Unmarshal
 	switch v := val.(type) {
 	case bool:
 		return lua.LBool(v)
 	case string:
 		return lua.LString(v)
-	case int, int8, int16, int32, int64, float32, float64:
-		f := v.(float64)
-		return lua.LNumber(f)
+	case float64:
+		return lua.LNumber(v)
 	case map[string]interface{}:
-		//mapVal, _ := v.(map[string]interface{})
 		return r.convertMap(l, v)
 	case []interface{}:
 		lt := l.NewTable()
-		//arrayVal, _ := val.([]interface{})
 		for k, v := range v {
 			lt.RawSetInt(k, r.convertValue(l, v))
 		}
@@ -273,6 +271,7 @@ func (r *ScriptRuntime) convertValue(l *lua.LState, val interface{}) lua.LValue 
 }
 
 func (r *ScriptRuntime) convertLuaValue(lv lua.LValue) interface{} {
+	// taken from https://github.com/yuin/gluamapper/blob/master/gluamapper.go#L79
 	switch v := lv.(type) {
 	case *lua.LNilType:
 		return nil
